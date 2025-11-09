@@ -175,3 +175,49 @@ func TestGetImagesFromHTML(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractPageData(t *testing.T) {
+	tests := []struct {
+		name     string
+		html     string
+		pageURL  string
+		expected PageData
+	}{
+		{
+			name:    "basic page",
+			html:    `<html><body><h1>Title</h1><main><p>Main paragraph.</p></main><a href="page1.html">Link</a><img src="image1.jpg"/></body></html>`,
+			pageURL: "http://example.com",
+			expected: PageData{
+				URL:            "http://example.com",
+				H1:             "Title",
+				FirstParagraph: "Main paragraph.",
+				OutgoingLinks:  []string{"http://example.com/page1.html"},
+				ImageURLs:      []string{"http://example.com/image1.jpg"},
+			},
+		},
+	}
+
+	for i, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := extractPageData(tc.html, tc.pageURL)
+			if actual.URL != tc.expected.URL ||
+				actual.H1 != tc.expected.H1 ||
+				actual.FirstParagraph != tc.expected.FirstParagraph ||
+				len(actual.OutgoingLinks) != len(tc.expected.OutgoingLinks) ||
+				len(actual.ImageURLs) != len(tc.expected.ImageURLs) {
+				t.Errorf("Test %v - %s FAIL: expected: '%v', actual: '%v'", i, tc.name, tc.expected, actual)
+				return
+			}
+			for j := range actual.OutgoingLinks {
+				if actual.OutgoingLinks[j] != tc.expected.OutgoingLinks[j] {
+					t.Errorf("Test %v - %s FAIL: expected OutgoingLinks[%d]: '%v', actual[%d]: '%v'", i, tc.name, j, tc.expected.OutgoingLinks[j], j, actual.OutgoingLinks[j])
+				}
+			}
+			for j := range actual.ImageURLs {
+				if actual.ImageURLs[j] != tc.expected.ImageURLs[j] {
+					t.Errorf("Test %v - %s FAIL: expected ImageURLs[%d]: '%v', actual[%d]: '%v'", i, tc.name, j, tc.expected.ImageURLs[j], j, actual.ImageURLs[j])
+				}
+			}
+		})
+	}
+}

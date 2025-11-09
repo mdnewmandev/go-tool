@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -108,6 +109,39 @@ func getImagesFromHTML(htmlBody string, baseURL *url.URL) ([]string, error) {
 	return returnedImages, nil
 }
 
+type PageData struct {
+	URL           	string
+	H1            	string
+	FirstParagraph string
+	OutgoingLinks 	[]string
+	ImageURLs     	[]string
+}
+
+func extractPageData(html, pageURL string) PageData {
+	base, err := url.Parse(pageURL)
+	if err != nil {
+		base = &url.URL{}
+	}
+
+	return PageData{
+		URL:	   		pageURL,
+		H1:        		getH1fromHTML(html),
+		FirstParagraph: getFirstParagraphFromHTMLMainPriority(html),
+		OutgoingLinks:  func() []string { urls, _ := getURLsFromHTML(html, base); return urls }(),
+		ImageURLs: 		func() []string { imgs, _ := getImagesFromHTML(html, base); return imgs }(),
+	}
+}
+
 func main() {
-	fmt.Println("Hello, World!")
+	if len(os.Args[1:]) < 1 {
+		fmt.Println("no website provided")
+		os.Exit(1)
+	}
+	if len(os.Args[1:]) > 1 {
+		fmt.Println("too many arguments provided")
+		os.Exit(1)
+	}
+	if len(os.Args[1:]) == 1 {
+		fmt.Printf("starting crawl of: %s", os.Args[1])
+	}
 }
