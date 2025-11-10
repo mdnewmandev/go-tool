@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -135,7 +136,6 @@ func extractPageData(html, pageURL string) PageData {
 }
 
 func getHTML(rawURL string) (string, error) {
-	// Use http.NewRequest with an http.Client to fetch the webpage of the rawURL. Set a User-Agent header (e.g. BootCrawler/1.0) to avoid being blocked by servers.
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", rawURL, nil)
 	if err != nil {
@@ -167,7 +167,72 @@ func getHTML(rawURL string) (string, error) {
 	return string(bodyBytes), nil
 }
 
+func crawlPage(rawBaseURL, rawCurrentURL string, pages map[string]int) { 
+	if rawCurrentURL == "" {
+		rawCurrentURL = rawBaseURL
+	}
+
+	rawCurrentURL = strings.TrimSuffix(rawCurrentURL, "/")
+	
+	if _, exists := pages[rawCurrentURL]; exists {
+		pages[rawCurrentURL]++
+		return
+	} else {
+		pages[rawCurrentURL] = 1
+	}
+
+	html, err := getHTML(rawCurrentURL)
+
+	if err != nil {
+		fmt.Printf("error fetching HTML: %v", err)
+		fmt.Println()
+	}
+	
+	pageData := extractPageData(html, rawCurrentURL)
+
+	fmt.Printf("Crawled URL: %s\n", pageData.URL)
+	fmt.Printf("Number of Outgoing Links: %d\n", len(pageData.OutgoingLinks))
+	fmt.Println("================================")
+
+	base, err := url.Parse(rawBaseURL)
+	if err != nil {
+		fmt.Printf("error parsing base URL: %v", err)
+		os.Exit(1)
+	}
+
+	for _, link := range pageData.OutgoingLinks {
+		parsedLink, err := url.Parse(link)
+		if err != nil {
+			continue
+		}
+		if parsedLink.Host == base.Host {
+			crawlPage(rawBaseURL, link, pages)
+		}
+	}
+}
+
+// printPages prints each page URL and its visit count on a new line.
+// It sorts the keys so output is deterministic.
+func printPages(pages map[string]int) {
+	if len(pages) == 0 {
+		fmt.Println("(no pages)")
+		return
+	}
+
+	keys := make([]string, 0, len(pages))
+	for k := range pages {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		fmt.Printf("%s: %d\n", k, pages[k])
+	}
+}
+
 func main() {
+	rawBaseURL := os.Args[1]
+	
 	if len(os.Args[1:]) < 1 {
 		fmt.Println("no website provided")
 		os.Exit(1)
@@ -177,16 +242,19 @@ func main() {
 		os.Exit(1)
 	}
 	if len(os.Args[1:]) == 1 {
-		fmt.Printf("starting crawl of: %s", os.Args[1])
+		fmt.Printf("starting crawl of: %s", rawBaseURL)
 		fmt.Println()
 	}
-	html, err := getHTML(os.Args[1])
-	if err != nil {
-		fmt.Printf("error fetching HTML: %v", err)
-		os.Exit(1)
-	}
-	// pageData := extractPageData(html, os.Args[1])
-	// fmt.Printf("Crawled Page Data: %+v\n", pageData)
+
+	pages := make(map[string]int)
+	crawlPage(rawBaseURL, "", pages)
+
+	fmt.Println()
+	fmt.Println("#################################")
+	fmt.Println("PAGES CRAWLED:")
+	printPages(pages)
+	fmt.Println()
+
+	fmt.Println("================================")
 	fmt.Println("Crawl completed successfully.")
-	fmt.Printf("Fetched HTML: %d\n", html)
 }
