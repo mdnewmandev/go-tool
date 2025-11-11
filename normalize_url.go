@@ -6,14 +6,17 @@ import (
 	"strings"
 )
 
-func normalizeURL(input string) (string, error) {
-	u, err := url.Parse(input)
+func normalizeURL(rawURL string) (string, error) {
+	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("couldn't parse URL: %w", err)
 	}
-	
-	normalizedURL := u.Host + strings.TrimSuffix(u.Path, "/")
-	fmt.Println(normalizedURL)
-	
-	return normalizedURL, nil
+
+	fullPath := parsedURL.Host + parsedURL.Path
+
+	fullPath = strings.ToLower(fullPath)
+
+	fullPath = strings.TrimSuffix(fullPath, "/")
+
+	return fullPath, nil
 }

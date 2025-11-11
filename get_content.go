@@ -6,50 +6,28 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-func getH1fromHTML(html string) string {
-	headerContent := ""
-	
-	if len(html) == 0 {
-		return ""
-	}
-
+func getH1FromHTML(html string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return ""
 	}
-	
-	doc.Find("h1").Each(func(i int, s *goquery.Selection) {
-		headerContent = s.Text()
-	})
-
-	return headerContent
+	h1 := doc.Find("h1").First().Text()
+	return strings.TrimSpace(h1)
 }
 
-func getFirstParagraphFromHTMLMainPriority(html string) string {
-	paragraphContent := ""
-	
-	if len(html) == 0 {
-		return ""
-	}
-
+func getFirstParagraphFromHTML(html string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return ""
 	}
-	
-	doc.Find("main p").EachWithBreak(func(i int, s *goquery.Selection) bool {
-		paragraphContent = s.Text()
-		return false // Break after the first match
-	})
 
-	if paragraphContent != "" {
-		return paragraphContent
+	main := doc.Find("main")
+	var p string
+	if main.Length() > 0 {
+		p = main.Find("p").First().Text()
+	} else {
+		p = doc.Find("p").First().Text()
 	}
 
-	doc.Find("p").EachWithBreak(func(i int, s *goquery.Selection) bool {
-		paragraphContent = s.Text()
-		return false // Break after the first match
-	})
-
-	return paragraphContent
+	return strings.TrimSpace(p)
 }
