@@ -3,48 +3,33 @@ package main
 import (
 	"fmt"
 	"os"
-	"sort"
 )
 
-func printPages(pages map[string]int) {
-	if len(pages) == 0 {
-		fmt.Println("(no pages)")
-		return
-	}
-
-	keys := make([]string, 0, len(pages))
-	for k := range pages {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		fmt.Printf("%s: %d\n", k, pages[k])
-	}
-}
-
 func main() {
-	rawBaseURL := os.Args[1]
-	
-	if len(os.Args[1:]) < 1 {
+	if len(os.Args) < 2 {
 		fmt.Println("no website provided")
 		os.Exit(1)
 	}
-	if len(os.Args[1:]) > 1 {
+	if len(os.Args) > 2 {
 		fmt.Println("too many arguments provided")
 		os.Exit(1)
 	}
-	if len(os.Args[1:]) == 1 {
-		fmt.Printf("starting crawl of: %s", rawBaseURL)
-		fmt.Println()
+	rawBaseURL := os.Args[1]
+
+	const maxConcurrency = 3
+	cfg, err := configure(rawBaseURL, maxConcurrency)
+	if err != nil {
+		fmt.Printf("Error - configure: %v", err)
+		return
 	}
 
-	pages := make(map[string]int)
-	crawlPage(rawBaseURL, "", pages)
+	fmt.Printf("starting crawl of: %s...\n", rawBaseURL)
 
-	fmt.Println()
-	fmt.Println("================================")
-	fmt.Println("Crawl completed successfully.")
-	printPages(pages)
-	fmt.Println()
+	cfg.wg.Add(1)
+	go cfg.crawlPage(rawBaseURL)
+	cfg.wg.Wait()
+
+	for normalizedURL, count := range cfg.pages {
+		fmt.Printf("%v - %s\n", count, normalizedURL)
+	}
 }

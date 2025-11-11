@@ -3,50 +3,53 @@ package main
 import (
 	"fmt"
 	"net/url"
-	"os"
-	"strings"
 )
 
-func crawlPage(rawBaseURL, rawCurrentURL string, pages map[string]int) { 
-	if rawCurrentURL == "" {
-		rawCurrentURL = rawBaseURL
-	}
+func (cfg *config) crawlPage(rawCurrentURL string) {
+	cfg.concurrencyControl <- struct{}{}
+	defer func() {
+		<-cfg.concurrencyControl
+		cfg.wg.Done()
+	}()
 
-	rawCurrentURL = strings.TrimSuffix(rawCurrentURL, "/")
-	
-	if _, exists := pages[rawCurrentURL]; exists {
-		pages[rawCurrentURL]++
+	currentURL, err := url.Parse(rawCurrentURL)
+	if err != nil {
+		fmt.Printf("Error - crawlPage: couldn't parse URL '%s': %v\n", rawCurrentURL, err)
 		return
-	} else {
-		pages[rawCurrentURL] = 1
 	}
 
-	html, err := getHTML(rawCurrentURL)
+	// stay within the same site
+	if currentURL.Hostname() != cfg.baseURL.Hostname() {
+		return
+	}
 
+	normalizedURL, err := normalizeURL(rawCurrentURL)
 	if err != nil {
-		fmt.Printf("error fetching HTML: %v", err)
-		fmt.Println()
+		fmt.Printf("Error - normalizedURL: %v", err)
+		return
 	}
-	
-	pageData := extractPageData(html, rawCurrentURL)
 
-	fmt.Printf("Crawled URL: %s\n", pageData.URL)
-	fmt.Printf("Number of Outgoing Links: %d\n", len(pageData.OutgoingLinks))
-	fmt.Println("================================")
+	// Only proceed the first time we see this normalized URL
+	isFirst := cfg.addPageVisit(normalizedURL)
+	if !isFirst {
+		return
+	}
 
-	base, err := url.Parse(rawBaseURL)
+	fmt.Printf("crawling %s\n", rawCurrentURL)
+
+	htmlBody, err := getHTML(rawCurrentURL)
 	if err != nil {
-		fmt.Printf("error parsing base URL: %v", err)
-		os.Exit(1)
+		fmt.Printf("Error - getHTML: %v", err)
+		return
 	}
 
-	for _, link := range pageData.OutgoingLinks {
-		parsedLink, err := url.Parse(link)
-		if err != nil {
-			continue
-		}
-		if parsedLink.Host == base.Host {
-			crawlPage(rawBaseURL, link, pages)
-		}
+	// Extract all the data we care about and store it
+	pageData := extractPageData(htmlBody, rawCurrentURL)
+	cfg.setPageData(normalizedURL, pageData)
+
+	// Recurse using the already-extracted outgoing links
+	for _, nextURL := range pageData.OutgoingLinks {
+		cfg.wg.Add(1)
+		go cfg.crawlPage(nextURL)
 	}
 }
