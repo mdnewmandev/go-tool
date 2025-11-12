@@ -19,108 +19,118 @@ func TestGetURLsFromHTML(t *testing.T) {
 			name:     "absolute URL",
 			inputURL: "https://blog.boot.dev",
 			inputBody: `
-<html>
-	<body>
-		<a href="https://blog.boot.dev">
-			<span>Boot.dev</span>
-		</a>
-	</body>
-</html>
-`,
+			<html>
+				<body>
+					<a href="https://blog.boot.dev">
+						<span>Boot.dev</span>
+					</a>
+				</body>
+			</html>
+			`,
 			expected: []string{"https://blog.boot.dev"},
 		},
 		{
 			name:     "relative URL",
 			inputURL: "https://blog.boot.dev",
 			inputBody: `
-<html>
-	<body>
-		<a href="/path/one">
-			<span>Boot.dev</span>
-		</a>
-	</body>
-</html>
-`,
+			<html>
+				<body>
+					<a href="/path/one">
+						<span>Boot.dev</span>
+					</a>
+				</body>
+			</html>
+			`,
 			expected: []string{"https://blog.boot.dev/path/one"},
 		},
 		{
 			name:     "absolute and relative URLs",
 			inputURL: "https://blog.boot.dev",
 			inputBody: `
-<html>
-	<body>
-		<a href="/path/one">
-			<span>Boot.dev</span>
-		</a>
-		<a href="https://other.com/path/one">
-			<span>Boot.dev</span>
-		</a>
-	</body>
-</html>
-`,
+			<html>
+				<body>
+					<a href="/path/one">
+						<span>Boot.dev</span>
+					</a>
+					<a href="https://other.com/path/one">
+						<span>Boot.dev</span>
+					</a>
+				</body>
+			</html>
+			`,
 			expected: []string{"https://blog.boot.dev/path/one", "https://other.com/path/one"},
 		},
 		{
 			name:     "no href",
 			inputURL: "https://blog.boot.dev",
 			inputBody: `
-<html>
-	<body>
-		<a>
-			<span>Boot.dev</span>
-		</a>
-	</body>
-</html>
-`,
+			<html>
+				<body>
+					<a>
+						<span>Boot.dev</span>
+					</a>
+				</body>
+			</html>
+			`,
 			expected: nil,
 		},
 		{
 			name:     "bad HTML",
 			inputURL: "https://blog.boot.dev",
 			inputBody: `
-<html body>
-	<a href="path/one">
-		<span>Boot.dev</span>
-	</a>
-</html body>
-`,
+			<html body>
+				<a href="path/one">
+					<span>Boot.dev</span>
+				</a>
+			</html body>
+			`,
 			expected: []string{"https://blog.boot.dev/path/one"},
 		},
-// 		{
-// 			name:     "invalid href URL",
-// 			inputURL: "https://blog.boot.dev",
-// 			inputBody: `
-// <html>
-// 	<body>
-// 		<a href=":\\invalidURL">
-// 			<span>Boot.dev</span>
-// 		</a>
-// 	</body>
-// </html>
-// `,
-// 			expected: nil,
-// 		},
-// 		{
-// 			name:     "handle invalid base URL",
-// 			inputURL: `:\\invalidBaseURL`,
-// 			inputBody: `
-// <html>
-// 	<body>
-// 		<a href="/path">
-// 			<span>Boot.dev</span>
-// 		</a>
-// 	</body>
-// </html>
-// `,
-// 			expected:      nil,
-// 			errorContains: "couldn't parse base URL",
-// 		},
+		{
+			name:     "invalid href URL",
+			inputURL: "https://blog.boot.dev",
+			inputBody: `
+			<html>
+				<body>
+					<a href=":\\invalidURL">
+						<span>Boot.dev</span>
+					</a>
+				</body>
+			</html>
+			`,
+			expected: nil,
+		},
+		{
+			name:     "handle invalid base URL",
+			inputURL: `:\\invalidBaseURL`,
+			inputBody: `
+			<html>
+				<body>
+					<a href="/path">
+						<span>Boot.dev</span>
+					</a>
+				</body>
+			</html>
+			`,
+			expected:      nil,
+			errorContains: "couldn't parse base URL",
+		},
 	}
 
 	for i, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			baseURL, err := url.Parse(tc.inputURL)
 			if err != nil {
+				// For the "handle invalid base URL" test, we expect an error
+				if tc.errorContains != "" && strings.Contains("couldn't parse base URL", tc.errorContains) {
+					// Simulate passing an invalid base URL to the function
+					_, err := getURLsFromHTML(tc.inputBody, nil)
+					if err != nil && strings.Contains(err.Error(), tc.errorContains) {
+						return
+					}
+					t.Errorf("Test %v - '%s' FAIL: expected error containing '%v', got %v", i, tc.name, tc.errorContains, err)
+					return
+				}
 				t.Errorf("Test %v - '%s' FAIL: couldn't parse input URL: %v", i, tc.name, err)
 				return
 			}

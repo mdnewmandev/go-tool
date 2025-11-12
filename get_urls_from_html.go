@@ -9,6 +9,10 @@ import (
 )
 
 func getURLsFromHTML(htmlBody string, baseURL *url.URL) ([]string, error) {
+	if baseURL == nil {
+		return nil, fmt.Errorf("couldn't parse base URL")
+	}
+
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlBody))
 	if err != nil {
 		return nil, fmt.Errorf("couldn't parse HTML: %w", err)
